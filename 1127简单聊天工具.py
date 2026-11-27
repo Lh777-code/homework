@@ -1,14 +1,3 @@
-"""
-FastAPI + LangChain 多轮对话聊天服务（纯净版）
-
-安装依赖：
-    pip install fastapi uvicorn langchain langchain-openai pydantic
-
-启动：
-    python main.py
-浏览器访问：
-    http://127.0.0.1:8000
-"""
 
 import os
 
@@ -21,24 +10,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_openai import ChatOpenAI
 
-# =====================================================================
-# 顶部集中配置区：切换模型只改这里（ChatOpenAI 兼容所有 OpenAI 协议服务）
-# ---------------------------------------------------------------------
-# 1) DeepSeek：
-#       BASE_URL   = "https://api.deepseek.com/v1"
-#       MODEL_NAME = "deepseek-chat"
-#       API_KEY    = "sk-xxxx"
-#
-# 2) 硅基流动：
-#       BASE_URL   = "https://api.siliconflow.cn/v1"
-#       MODEL_NAME = "Qwen/Qwen2.5-7B-Instruct"
-#       API_KEY    = "sk-xxxx"
-#
-# 3) 本地 Ollama（先执行 `ollama serve`，并 `ollama pull qwen2.5`）：
-#       BASE_URL   = "http://127.0.0.1:11434/v1"   # 踩坑点：必须带 /v1 后缀
-#       MODEL_NAME = "qwen2.5"
-#       API_KEY    = "dummy"                        # Ollama 不校验，但 SDK 要求非空
-# =====================================================================
+
 MODEL_NAME = "qwen2.5:7b"
 API_KEY = "123"
 BASE_URL = "http://127.0.0.1:11434/v1"
@@ -46,24 +18,15 @@ TEMPERATURE = 0.7
 
 SYSTEM_PROMPT = "你是一个友好、专业的中文 AI 助手，回答简洁准确，必要时分点说明。"
 
-# =====================================================================
-# 模型与提示词
-# =====================================================================
-# ChatOpenAI 采用 OpenAI 兼容协议，只要服务支持 /v1/chat/completions，
-# 就能通过 base_url 接入，无需改动下面的调用逻辑。
+
 llm = ChatOpenAI(
     model=MODEL_NAME,
-    api_key=API_KEY,        # 直接传字符串即可，内部会转成 SecretStr
-    base_url=BASE_URL,      # 切换服务商的关键参数
+    api_key=API_KEY,        
+    base_url=BASE_URL,      
     temperature=TEMPERATURE,
 )
 
-# 三段式提示词模板：
-#   1. system      ：角色设定
-#   2. MessagesPlaceholder：多轮对话历史占位符。它不会把历史拼成一段字符串，
-#      而是把 HumanMessage / AIMessage 对象原样插入到该位置，保留角色信息。
-#      变量名必须与 invoke 时传入的字典 key 严格一致（这里是 chat_history）。
-#   3. human       ：本轮用户输入
+
 prompt = ChatPromptTemplate.from_messages(
     [
         ("system", SYSTEM_PROMPT),
@@ -84,14 +47,9 @@ class ChatRequest(BaseModel):
     chat_history: list[tuple[str, str]] = Field(default_factory=list)
 
 
-# =====================================================================
 # 接口
-# =====================================================================
 @app.post("/chat")
 async def chat(req: ChatRequest):
-    # 把 [(user, ai), ...] 循环转换成 LangChain 消息对象。
-    # 踩坑点：绝不能把历史拼成一个字符串塞给模型，
-    # 那样会丢失“谁说的”这一角色信息，多轮对话就会乱。
     history_messages = []
     for user_text, ai_text in req.chat_history:
         history_messages.append(HumanMessage(content=user_text))
@@ -114,9 +72,7 @@ async def index():
     return HTML_PAGE
 
 
-# =====================================================================
-# 内置聊天页面（纯原生 HTML + JS，无任何前端框架）
-# =====================================================================
+# 内置聊天页面（纯原生 HTML + JS）
 HTML_PAGE = """
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -238,16 +194,6 @@ HTML_PAGE = """
 """
 
 
-if __name__ == "__main__":
-    # 踩坑点一：开了 reload=True 时，必须传 "模块名:app" 字符串，
-    # 不能传 app 对象，否则 uvicorn 无法重新导入模块，reload 不生效。
-    #
-    # 踩坑点二：127.0.0.1 只允许本机访问；0.0.0.0 监听所有网卡（局域网可访问，
-    # 本地开发用 127.0.0.1 更安全）。浏览器也必须用 127.0.0.1:8000 打开。
-    #
-    # 踩坑点三：模块名必须和当前文件名一致！原来写死 "main:app"，
-    # 运行本文件（简单聊天工具.py）时 uvicorn 会去找名为 main 的模块，
-    # 结果要么 ModuleNotFoundError，要么误加载别的 main.py。
-    # 这里按当前文件名动态生成，以后改名也不用再动这一行。
+if __name__ == "__main__": 
     module_name = os.path.splitext(os.path.basename(__file__))[0]
     uvicorn.run(f"{module_name}:app", host="127.0.0.1", port=8080, reload=True)
